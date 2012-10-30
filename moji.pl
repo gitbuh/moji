@@ -10,7 +10,6 @@ use DateTime::Format::Duration;
 use IO::Socket::SSL;
 use IO::Socket::INET;
 use URI::Escape;
-use WWW::Mechanize;
 use HTML::Strip;
 use XML::Simple;
 use JSON;
@@ -18,15 +17,14 @@ use POE;
 use POE::Component::IRC;
 use MIME::Base64;
 
-# Someone needs to be able to control the bot.
-# !op <nick> to add more operators.
-# !deop <nick> to remove operators.
+if (@ARGV < 3) {
 
-my $admin = 'Bop'; # IRC admin user
+  print "
+    IRC nick, JIRA user name, and JIRA password are required.
+    usage: $0 <nick> <jira_username> <jira_password>\n\n";
+  exit 1;
 
-my $admin_auth = 'xxxxxxxx'; #base64-encoded JIRA username:password
-
-my %operators = ($admin => 1);
+}
 
 # JIRA root URL.
 my $root_path = "https://mojang.atlassian.net";
@@ -47,14 +45,31 @@ my $tick_interval_min = 5;
 # Maximum number of seconds between feed checks.
 my $tick_interval_max = 300; 
 
-my $tick_interval = $tick_interval_min;     
+my $tick_interval = $tick_interval_min;
 my $feed_updated = ""; 
 my $feed_last_desc = "";
-my $irc = POE::Component::IRC->spawn();
 
-my %channels = (); # Report feed to these channels
-my %auth = ( $admin => $admin_auth ); # All your base64 encoded JIRA logins are belong to us
-my %channel_nicks = (); # Who is in the channels? Use this to anti-highlight.
+# IRC admin user
+my $admin = $ARGV[1];
+
+#base64-encoded JIRA username:password
+my $admin_auth = encode_base64($ARGV[2] . ':' , $ARGV[3]);
+
+# All your base64 encoded JIRA logins are belong to us
+my %auth = ( $admin => $admin_auth );
+
+# Someone needs to be able to control the bot.
+# !op <nick> to add more operators.
+# !deop <nick> to remove operators.
+my %operators = ($admin => 1);
+
+# Report feed to these channels
+my %channels = (); 
+
+# Who is in the channels? Use this to anti-highlight.
+my %channel_nicks = (); 
+
+my $irc = POE::Component::IRC->spawn();
 
 # The bot session has started. Connect to a server.
 
@@ -127,7 +142,6 @@ sub on_msg {
   
     if ($msg =~ m/^!deop\s*(.+)/) {
       
-      
       if (!$operators{$1}) {
       
         $irc->yield(notice => $nick => 
@@ -158,7 +172,6 @@ sub on_msg {
     # msg
   
     if ($msg =~ m/^!msg\s*([^\s]+)\s*(.*)/) {
-      
       
       say_to($1, $2);
       return;
@@ -364,6 +377,8 @@ sub on_tick {
   
 }
 
+# We got a list of nicks in a channel (irc_353). 
+
 sub on_names {
 
   my ($kernel, $server, $response) = @_[KERNEL, ARG0, ARG1];
@@ -436,6 +451,8 @@ sub on_user_nick {
 
 }
 
+# Send some text to a comma-delimited list of channels/users.
+
 sub say_to {
 
   my ($channel, $text) = @_;
@@ -443,6 +460,9 @@ sub say_to {
   $irc->yield(privmsg => $channel, anti_highlight($channel, $text));
 
 }
+
+# Search channels for IRC nicks that also occur in the message.
+# Mangle message so it no longer contains the nicks.
 
 sub anti_highlight {
 
@@ -520,7 +540,6 @@ sub ago {
 
 }
 
-
 # Show issue
 
 sub show_issue {
@@ -560,19 +579,18 @@ sub show_issue {
 }
 
 # Shorten a URL using goo.gl
-# https://developers.google.com/url-shortener/v1/getting_started#shorten
+# https://developers.google.com/url-shortener/v1/getting_started
   
 sub shorten_url {
 
   my $url = shift;
   
-  my $client = new IO::Socket::SSL("www.googleapis.com:https");
-  
   my %request = ( longUrl => $url );
   
   my $data = encode_json(\%request);
   
-  my $response = http( "POST", 'https://www.googleapis.com/urlshortener/v1/url', 
+  my $response = http("POST", 
+    'https://www.googleapis.com/urlshortener/v1/url', 
     ( "Content-Type: application/json" ),
     $data
   );
@@ -584,7 +602,6 @@ sub shorten_url {
   return $obj->{id};
     
 }
-
 
 # Fetch JSON from a URL
 
@@ -602,9 +619,8 @@ sub fetch_json {
 sub fetch_xml {
 
   my $xml_url = shift;
+  # setting KeyAttr prevents id elements from becoming keys of parent elements.
   my $xml = new XML::Simple(KeyAttr => 'xxxx'); #TODO: make global?
-  # setting KeyAttr to prevent id elements from becoming keys of parent elements 
-    
   return $xml->XMLin(http('GET', $xml_url));
 
 }
