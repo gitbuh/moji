@@ -51,10 +51,12 @@ my $feed_updated = "";
 my $feed_last_desc = "";
 
 # IRC admin user
-my $admin = $ARGV[1];
+my $admin = $ARGV[0];
+
+print "admin: $admin\n";
 
 #base64-encoded JIRA username:password
-my $admin_auth = encode_base64($ARGV[2] . ':' , $ARGV[3]);
+my $admin_auth = encode_base64($ARGV[1] . ':' . $ARGV[2]);
 
 # All your base64 encoded JIRA logins are belong to us
 my %auth = ( $admin => $admin_auth );
@@ -611,7 +613,7 @@ sub fetch_json {
   my ($url, $auth) = @_;
   my $json = new JSON; #TODO: make global?
   my $response = !$auth ? http('GET', $url) : 
-      http('GET', $url, ( "Authorization: Basic $auth)" ));
+      http('GET', $url, ( "Authorization: Basic $auth" ));
   return $json->decode($response);
 }
 
