@@ -10,6 +10,7 @@ use DateTime::Format::Duration;
 use IO::Socket::SSL;
 use IO::Socket::INET;
 use URI::Escape;
+use WWW::Mechanize;
 use HTML::Strip;
 use XML::Simple;
 use JSON;
@@ -23,7 +24,7 @@ use MIME::Base64;
 
 my $admin = 'Bop'; # IRC admin user
 
-my $admin_auth = 'xxxxxxxxxxxxxxxx'; #base64-encoded JIRA username:password
+my $admin_auth = 'xxxxxxxx'; #base64-encoded JIRA username:password
 
 my %operators = ($admin => 1);
 
@@ -105,91 +106,91 @@ sub on_msg {
     # op
   
     if ($msg =~ m/^!op\s*(.+)/) {
-	    
-	    if ($operators{$1}) {
-	      
+      
+      if ($operators{$1}) {
+        
         $irc->yield(notice => $nick => 
             "$1 is already an operator.");
             
         return;
         
-	    }
-	    
+      }
+      
       $operators{$1} = $op_rank + 1;
     
       $irc->yield(ctcp => $channel => 
           "ACTION is now accepting operator commands from $1.");
-	    
+      
     }
     
     # de-op
   
     if ($msg =~ m/^!deop\s*(.+)/) {
-	    
-	    
-	    if (!$operators{$1}) {
-	    
+      
+      
+      if (!$operators{$1}) {
+      
         $irc->yield(notice => $nick => 
             "$1 isn't an operator.");
             
         return;
-	    
-	    }
-	    
-	    if ($operators{$1} <= $op_rank) {
-	    
+      
+      }
+      
+      if ($operators{$1} <= $op_rank) {
+      
         $irc->yield(notice => $nick => 
             "Operator rank for $1 equals or exceeds your own.");
             
         return;
-	    
-	    }
-	    
+      
+      }
+      
       delete $operators{$1};
       
       $irc->yield(ctcp => $channel => 
           "ACTION is no longer accepting operator commands from $1.");
           
       return;
-	    
+      
     }
     
     # msg
   
     if ($msg =~ m/^!msg\s*([^\s]+)\s*(.*)/) {
-	    
-	    
+      
+      
       say_to($1, $2);
-	    return;
-	    
+      return;
+      
     }
     
     # ident(ify)
   
     if ($msg =~ m/^!ident(?:ify)?\s*(.+)/) {
-	    
-	    $irc->yield(nickserv => "IDENTIFY $1");
-	    return;
-	    
+      
+      $irc->yield(nickserv => "IDENTIFY $1");
+      return;
+      
     }
     
     # single-arg eponymous commands
     # nick, join, part, mode
   
     if ($msg =~ m/^!(nick|join|part|mode)\s*(.+)/) {
-	    
-	    $irc->yield($1, $2);
-	    return;
-	    
+      
+      $irc->yield($1, $2);
+      return;
+      
     }
     
     # raw
   
     if ($msg =~ m/^!raw\s*(.+)/) {
-	    
-	    $irc->yield(quote => $1);
-	    return;
-	    
+      
+      $irc->yield(quote => $1);
+      return;
+      
     }
   
   }
@@ -223,7 +224,7 @@ sub on_msg {
           "ACTION is now reporting activity to $channel.");
           
       $channels{$channel} = 1;
-	      
+        
       $tick_interval = $tick_interval_min;
     
       $_[KERNEL]->delay(bot_tick => 0);
@@ -283,9 +284,9 @@ sub on_msg {
     eval {
     
       show_issue(fetch_json($json_url, $auth{$admin}), $channel);
-	  
-	  };
-	  
+    
+    };
+    
   }
   
 }
