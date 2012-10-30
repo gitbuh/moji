@@ -10,7 +10,6 @@ use DateTime::Format::Duration;
 use IO::Socket::SSL;
 use IO::Socket::INET;
 use URI::Escape;
-use WWW::Mechanize;
 use HTML::Strip;
 use XML::Simple;
 use JSON;
@@ -22,7 +21,7 @@ use MIME::Base64;
 # !op <nick> to add more operators.
 # !deop <nick> to remove operators.
 
-my $admin = 'Bop'; # JIRA moderator user
+my $admin = 'Bop'; # IRC admin user
 
 my $admin_auth = 'xxxxxxxxxxxxxxxx'; #base64-encoded JIRA username:password
 
