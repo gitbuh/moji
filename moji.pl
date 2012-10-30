@@ -17,6 +17,7 @@ use JSON;
 use POE;
 use POE::Component::IRC;
 use MIME::Base64;
+use Acme::Umlautify;
 
 if (@ARGV < 2) {
 
@@ -39,7 +40,6 @@ if (@ARGV < 3) {
   print "\n\n";
 
 }
-
 
 # JIRA root URL.
 my $root_path = "https://mojang.atlassian.net";
@@ -499,14 +499,12 @@ sub anti_highlight {
     return $text;
   
   }
-  
-  my $shy = chr(0x00ad); #soft hyphen.
 
   $names =~ s/\|/\\|/g; #escape pipes
   
   $names =~ s/(\s+)/\|/g; #delimit with pipes
   
-  $text =~ s/\b($names)\b/@{[(substr $1, 0, 1) . $shy . (substr $1, 1)]}/g;
+  $text =~ s/\b($names)\b/@{[Acme::Umlautify::umlautify($1)]}/g;
   
   return $text;
 
