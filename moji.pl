@@ -1,6 +1,7 @@
 #!/usr/bin/perl
-
 # http://search.cpan.org/dist/POE-Component-IRC/lib/POE/Component/IRC.pm
+
+# The latest version of this script may not be tested; use at your own risk.
 
 use warnings;
 use strict;
