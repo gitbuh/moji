@@ -18,14 +18,28 @@ use POE;
 use POE::Component::IRC;
 use MIME::Base64;
 
-if (@ARGV < 3) {
+if (@ARGV < 2) {
 
   print "
-    IRC nick, JIRA user name, and JIRA password are required.
-    usage: $0 <nick> <jira_username> <jira_password>\n\n";
+    IRC bot operator nick and JIRA user name are required.
+    usage: $0 <op_nick> <jira_username> [jira_password]\n\n";
   exit 1;
 
 }
+
+if (@ARGV < 3) {
+
+  print "
+    Enter your JIRA password: ";
+    
+  system('stty','-echo');
+  $ARGV[2] = <STDIN>;
+  system('stty','echo');
+  
+  print "\n\n";
+
+}
+
 
 # JIRA root URL.
 my $root_path = "https://mojang.atlassian.net";
@@ -52,8 +66,6 @@ my $feed_last_desc = "";
 
 # IRC admin user
 my $admin = $ARGV[0];
-
-print "admin: $admin\n";
 
 #base64-encoded JIRA username:password
 my $admin_auth = encode_base64($ARGV[1] . ':' . $ARGV[2]);
