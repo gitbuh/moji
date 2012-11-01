@@ -330,7 +330,7 @@ sub on_tick {
   # Check if entry 0 has a new timestamp
   # TODO: HEAD request, check Last-Modified header
   
-  if ($d ne $feed_updated) {
+  if ($d && ($d ne $feed_updated)) {
   
     $feed_updated = $d;
       
@@ -356,13 +356,17 @@ sub on_tick {
           
       my $updated = $dp->parse_datetime($d);
       
-      my $link = shorten_url($entry->{link}->[0]->{href});
+      my $link = $entry->{link}->[0]->{href};
+      
+      eval {
+        $link = shorten_url($link);
+      };
       
       my $msg = "$desc (" . ago($updated) . ") - $link";
       
       my @targets = keys %channels;
       
-      print $msg;
+      # print "$msg\n";
       
       say_to(join(',', @targets), $msg);
     
@@ -441,7 +445,7 @@ sub on_user_parted {
     $channel_nicks{$channel} = "";
   };
   
-  $channel_nicks{$channel} =~ s/\s*$nick//g;
+  $channel_nicks{$channel} =~ s/\s*\b$nick\b//g;
   $channel_nicks{$channel} =~ s/\s+$//g;
   
   print "$nick parted $channel -> " . $channel_nicks{$channel} . "\n";
@@ -458,7 +462,7 @@ sub on_user_nick {
   
   while (my ($channel, $nicks) = each %channel_nicks) {
   
-    $channel_nicks{$channel} =~ s/$nick/$new_nick/g;
+    $channel_nicks{$channel} =~ s/\b$nick\b/$new_nick/g;
     
     print "$nick renamed to $new_nick -> " . $channel_nicks{$channel} . "\n";
     
@@ -634,8 +638,9 @@ sub fetch_xml {
   my $xml_url = shift;
   # setting KeyAttr prevents id elements from becoming keys of parent elements.
   my $xml = new XML::Simple(KeyAttr => 'xxxx'); #TODO: make global?
-  return $xml->XMLin(http('GET', $xml_url));
-
+  eval {
+    return $xml->XMLin(http('GET', $xml_url));
+  };
 }
 
 # Do http(s) stuff.
