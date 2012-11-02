@@ -53,6 +53,10 @@ my $json_path = "$root_path/rest/api/latest";
 # JIRA atom feed URL.
 my $feed_path = "$root_path/activity";
 
+# Bot can tell us where to find its source, not used for anything else.
+my $bot_source_url = "https://gist.github.com/3977511";
+
+
 # Minimum number of seconds between feed checks.
 # Interval is increased by this amount when there is no activity.
 my $tick_interval_min = 5;
@@ -301,6 +305,17 @@ sub on_msg {
     
     return;
     
+  }
+  
+  # Show link to bot's source
+  
+  if ($msg =~ m/^!source/) {
+    
+    my $blue = chr(0x3) . 2;
+    my $end = chr(0xf);
+    
+    say_to($channel, "My source code is available at $blue$bot_source_url$end");
+    return;
   }
   
   # Auto-link ticket keys
