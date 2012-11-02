@@ -445,7 +445,7 @@ sub on_user_parted {
     $channel_nicks{$channel} = "";
   };
   
-  $channel_nicks{$channel} =~ s/\s*\b$nick\b//g;
+  $channel_nicks{$channel} =~ s/\s*\b\Q$nick\E\b//g;
   $channel_nicks{$channel} =~ s/\s+$//g;
   
   print "$nick parted $channel -> " . $channel_nicks{$channel} . "\n";
@@ -462,7 +462,7 @@ sub on_user_nick {
   
   while (my ($channel, $nicks) = each %channel_nicks) {
   
-    $channel_nicks{$channel} =~ s/\b$nick\b/$new_nick/g;
+    $channel_nicks{$channel} =~ s/\b\Q$nick\E\b/$new_nick/g;
     
     print "$nick renamed to $new_nick -> " . $channel_nicks{$channel} . "\n";
     
