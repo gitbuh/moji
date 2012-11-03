@@ -56,6 +56,8 @@ my $feed_path = "$root_path/activity";
 # Bot can tell us where to find its source, not used for anything else.
 my $bot_source_url = "https://gist.github.com/3977511";
 
+# For !search command
+my $max_search_results = 5;
 
 # Minimum number of seconds between feed checks.
 # Interval is increased by this amount when there is no activity.
@@ -86,8 +88,13 @@ my %operators = ($admin => 1);
 my %channels = (); 
 
 # Who is in the channels? Use this to anti-highlight.
+# Keys are channel names, values are space-delimited lists of nicks. 
 my %channel_nicks = (); 
 
+# Who searched for what? 
+my %nick_searches = (); 
+
+# Set up our IRC "object environment."
 my $irc = POE::Component::IRC->spawn();
 
 # The bot session has started. Connect to a server.
@@ -269,39 +276,31 @@ sub on_msg {
   
   # Search for tickets using JQL
   
-  if ($msg =~ m/^!(?:find|search)\s*(.+)/) {
+  if ($msg =~ m/^!search\s*(.+)/) {
     
-    my $jql = uri_escape($1);
+    my $jql = $1;
     
-    my $json_url = "$json_path/search?jql=$jql&maxResults=5";
+    my $offset = 0;
     
-    eval {
+    @{$nick_searches{$who}} = ( $jql, 0 );
     
-      my $json = fetch_json($json_url, $auth{$admin});
-      
-      my @issues = @{$json->{issues}};
-      
-      if (@issues)  {
-              
-        my $msg = "Found " . $json->{total} . " results";
-        
-        if (@issues < $json->{total}) {
-          
-          $msg .= ", showing " . @issues; 
-          
-        }
-              
-        say_to($channel, "$msg.");
-        
-        foreach my $issue (@issues) {
-          
-          show_issue($issue, $channel);
-        
-        }
-      
-      }
-      
-    };
+    search($channel, $jql, $offset, $max_search_results);
+    
+    return;
+    
+  }
+
+  if ($msg =~ m/^!more/) {
+    
+    if (!$nick_searches{$who}) {
+      return;
+    }
+    
+    $nick_searches{$who}[1] += $max_search_results;
+    
+    my ($jql, $offset) = @{$nick_searches{$who}};
+    
+    search($channel, $jql, $offset, $max_search_results);
     
     return;
     
@@ -332,6 +331,37 @@ sub on_msg {
     
   }
   
+}
+
+sub search  {
+
+  my ($channel, $jql, $offset, $limit) = @_;
+  
+  my $json_url = "$json_path/search?jql=" . uri_escape($jql) 
+      . "&startAt=$offset&maxResults=$limit";
+    
+  my $json = fetch_json($json_url, $auth{$admin});
+  
+  my @issues = @{$json->{issues}};
+  
+  if (@issues)  {
+  
+    my $total = $json->{total};
+          
+    my $msg = "Showing results " . ($offset + 1) . " through " 
+        . ($offset + @issues) . " of $total for $jql.";
+          
+    say_to($channel, $msg);
+    
+    foreach my $issue (@issues) {
+      
+      show_issue($issue, $channel);
+    
+    }
+  
+  }
+      
+
 }
 
 # The bot ticks
@@ -621,8 +651,8 @@ sub shorten_url {
   
   my $data = encode_json(\%request);
   
-  my $response = http("POST", 
-    'https://www.googleapis.com/urlshortener/v1/url', 
+  my $response = http(
+    POST => 'https://www.googleapis.com/urlshortener/v1/url', 
     ( "Content-Type: application/json" ),
     $data
   );
@@ -641,8 +671,8 @@ sub fetch_json {
 
   my ($url, $auth) = @_;
   my $json = new JSON; #TODO: make global?
-  my $response = !$auth ? http('GET', $url) : 
-      http('GET', $url, ( "Authorization: Basic $auth" ));
+  my $response = !$auth ? http(GET => $url) : 
+      http(GET => $url, ( "Authorization: Basic $auth" ));
   return $json->decode($response);
 }
 
@@ -654,12 +684,13 @@ sub fetch_xml {
   # setting KeyAttr prevents id elements from becoming keys of parent elements.
   my $xml = new XML::Simple(KeyAttr => 'xxxx'); #TODO: make global?
   eval {
-    return $xml->XMLin(http('GET', $xml_url));
+    return $xml->XMLin(http(GET => $xml_url));
   };
 }
 
 # Do http(s) stuff.
 # Warning: fragile.
+
 sub http {
   
   my ($action, $url, $headers, $body) = @_;
@@ -693,7 +724,7 @@ sub http {
   
   close $socket;
   
-  $response =~ s/.*\r\n\r\n//ms; # strip the headers from the response
+  $response =~ s/.*$br$br//ms; # strip the headers from the response
   
   return $response;
 
