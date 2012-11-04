@@ -132,9 +132,7 @@ sub on_msg {
   my $channel = $where->[0];
   my $ts      = scalar localtime;
   
-  if ($channel eq $irc->nick_name()) {
-    $channel = $nick;
-  }
+  $channel = $nick if $channel eq $irc->nick_name();
   
   print " [$ts] <$nick:$channel> $msg\n";
   
@@ -148,14 +146,8 @@ sub on_msg {
   
     if ($msg =~ m/^!op\s*(.+)/) {
       
-      if ($operators{$1}) {
-        
-        $irc->yield(notice => $nick => 
-            "$1 is already an operator.");
-            
-        return;
-        
-      }
+      return $irc->yield(notice => $nick, 
+          "$1 is already an operator.") if $operators{$1};
       
       $operators{$1} = $op_rank + 1;
     
@@ -239,8 +231,8 @@ sub on_msg {
   if ($msg =~ m/^!(?:auth|login)\s*(.*)/) {
   
     $auth{$who} = encode_base64($1);
-    
     say_to($channel, "Logged in.");
+    return;
   
   }
   
@@ -257,20 +249,18 @@ sub on_msg {
       
       return;
     
-    } else {
-  
-      $irc->yield(ctcp => $channel => 
-          "ACTION is now reporting activity to $channel.");
-          
-      $channels{$channel} = 1;
-        
-      $tick_interval = $tick_interval_min;
-    
-      $_[KERNEL]->delay(bot_tick => 0);
-      
-      return;
-      
     }
+  
+    $irc->yield(ctcp => $channel => 
+        "ACTION is now reporting activity to $channel.");
+        
+    $channels{$channel} = 1;
+      
+    $tick_interval = $tick_interval_min;
+  
+    $_[KERNEL]->delay(bot_tick => 0);
+    
+    return;
     
   }
   
@@ -289,12 +279,12 @@ sub on_msg {
     return;
     
   }
+  
+  # Show the next page of search results
 
   if ($msg =~ m/^!more/) {
     
-    if (!$nick_searches{$who}) {
-      return;
-    }
+    return  if !$nick_searches{$who};
     
     $nick_searches{$who}[1] += $max_search_results;
     
@@ -313,7 +303,9 @@ sub on_msg {
     my $blue = chr(0x3) . 2;
     my $end = chr(0xf);
     
-    say_to($channel, "My source code is available at $blue$bot_source_url$end");
+    say_to($channel, 
+        "My source code is available at $blue$bot_source_url$end");
+        
     return;
   }
   
@@ -323,45 +315,10 @@ sub on_msg {
 
     my $json_url = "$json_path/issue/$1";
     
-    eval {
-    
-      show_issue(fetch_json($json_url, $auth{$admin}), $channel);
-    
-    };
+    eval { show_issue(fetch_json($json_url, $auth{$admin}), $channel); };
     
   }
   
-}
-
-sub search  {
-
-  my ($channel, $jql, $offset, $limit) = @_;
-  
-  my $json_url = "$json_path/search?jql=" . uri_escape($jql) 
-      . "&startAt=$offset&maxResults=$limit";
-    
-  my $json = fetch_json($json_url, $auth{$admin});
-  
-  my @issues = @{$json->{issues}};
-  
-  if (@issues)  {
-  
-    my $total = $json->{total};
-          
-    my $msg = "Showing results " . ($offset + 1) . " through " 
-        . ($offset + @issues) . " of $total for $jql.";
-          
-    say_to($channel, $msg);
-    
-    foreach my $issue (@issues) {
-      
-      show_issue($issue, $channel);
-    
-    }
-  
-  }
-      
-
 }
 
 # The bot ticks
@@ -403,9 +360,7 @@ sub on_tick {
       
       my $link = $entry->{link}->[0]->{href};
       
-      eval {
-        $link = shorten_url($link);
-      };
+      eval { $link = shorten_url($link); };
       
       my $msg = "$desc (" . ago($updated) . ") - $link";
       
@@ -427,17 +382,12 @@ sub on_tick {
   
     $tick_interval += $tick_interval_min;
     
-    if ($tick_interval > $tick_interval_max) {
-      
-      $tick_interval = $tick_interval_max;
-      
-    }
+    $tick_interval = $tick_interval_max 
+        if $tick_interval > $tick_interval_max;
   
   }
-  
-  if (%channels) {
-    $_[KERNEL]->delay(bot_tick => $tick_interval);
-  }
+   
+  $_[KERNEL]->delay(bot_tick => $tick_interval) if %channels;
   
 }
 
@@ -466,10 +416,8 @@ sub on_user_joined {
 
   my ($kernel, $who, $channel) = @_[KERNEL, ARG0, ARG1];
   my $nick = (split /!/, $who)[0];
-  
-  if (!$channel_nicks{$channel}) {
-    $channel_nicks{$channel} = "";
-  };
+   
+  $channel_nicks{$channel} = "" if !$channel_nicks{$channel};
   
   $channel_nicks{$channel} .= 
       ($channel_nicks{$channel} ? ' ' : '') . $nick;
@@ -486,10 +434,7 @@ sub on_user_parted {
   my ($kernel, $who, $channel) = @_[KERNEL, ARG0, ARG1];
   my $nick = (split /!/, $who)[0];
   
-  if (!$channel_nicks{$channel}) {
-    $channel_nicks{$channel} = "";
-  };
-  
+  $channel_nicks{$channel} = "" if !$channel_nicks{$channel};
   $channel_nicks{$channel} =~ s/\s*\b\Q$nick\E\b//g;
   $channel_nicks{$channel} =~ s/\s+$//g;
   
@@ -513,6 +458,72 @@ sub on_user_nick {
     
   }
 
+}
+
+sub search {
+
+  my ($channel, $jql, $offset, $limit) = @_;
+  
+  my $json_url = "$json_path/search?jql=" . uri_escape($jql) 
+      . "&startAt=$offset&maxResults=$limit";
+    
+  my $json = fetch_json($json_url, $auth{$admin}) or return;
+  
+  my @issues = @{$json->{issues}} or return;
+
+  my $total = $json->{total};
+  
+  my $bold = chr(0x2);
+  my $end = chr(0xf);
+        
+  my $msg = $bold . "Showing " . ($offset + 1) . " through " 
+      . ($offset + @issues) . " of $total results for $jql.$end";
+        
+  say_to($channel, $msg);
+  
+  foreach my $issue (@issues) {
+    
+    show_issue($issue, $channel);
+  
+  }
+      
+}
+
+# Show issue
+
+sub show_issue {
+    
+  my ($issue, $channel) = @_;
+  
+  my $dp = DateTime::Format::Strptime->new(
+      pattern => '%Y-%m-%dT%H:%M:%S.%N%z');
+
+  my $updated = $dp->parse_datetime($issue->{fields}->{updated});
+  
+  my $comments = 0;
+  
+  my $url = "$browse_path/" . $issue->{key};
+  
+  eval {
+    $comments = @{$issue->{fields}->{comment}->{comments}};
+  };
+  
+  eval {
+    $url = shorten_url($url);
+  };
+  
+  my $out = $issue->{key} . ": " 
+      . $issue->{fields}->{summary} 
+      . " - " . $issue->{fields}->{status}->{name} 
+      . ", updated " . ago($updated);
+      
+  if ($comments) {
+    my $s = $comments > 1 ? 's' : '';
+    $out .= " ($comments comment$s)";
+  }
+  
+  say_to($channel, "$out - $url");
+  
 }
 
 # Send some text to a comma-delimited list of channels/users.
@@ -602,43 +613,6 @@ sub ago {
 
 }
 
-# Show issue
-
-sub show_issue {
-
-  my $issue = shift();
-  my $channel = shift();
-  
-  my $dp = DateTime::Format::Strptime->new(
-      pattern => '%Y-%m-%dT%H:%M:%S.%N%z');
-
-  my $updated = $dp->parse_datetime($issue->{fields}->{updated});
-  
-  my $comments = 0;
-  
-  my $url = "$browse_path/" . $issue->{key};
-  
-  eval {
-    $comments = @{$issue->{fields}->{comment}->{comments}};
-  };
-  
-  eval {
-    $url = shorten_url($url);
-  };
-  
-  my $out = $issue->{key} . ": " 
-      . $issue->{fields}->{summary} 
-      . " - " . $issue->{fields}->{status}->{name} 
-      . ", updated " . ago($updated);
-      
-  if ($comments) {
-    my $s = $comments > 1 ? 's' : '';
-    $out .= " ($comments comment$s)";
-  }
-  
-  say_to($channel, "$out - $url");
-  
-}
 
 # Shorten a URL using goo.gl
 # https://developers.google.com/url-shortener/v1/getting_started
