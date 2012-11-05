@@ -690,14 +690,13 @@ sub fetch_json {
 
   my ($url, $auth) = @_;
   my $json = new JSON; #TODO: make global?
+  my $hash = {};
   my $response = !$auth ? http(GET => $url) : 
       http(GET => $url, ( "Authorization: Basic $auth" ));
       
-  eval {
-    return $json->decode($response);
-  };
+  eval { $hash = $json->decode($response) };
   
-  return @{[]};
+  return $hash;
 }
 
 # Fetch XML from a URL
