@@ -272,7 +272,47 @@ sub on_msg {
     
     my $offset = 0;
     
-    @{$nick_searches{$who}} = ( $jql, 0 );
+    @{$nick_searches{$who}} = ( $jql, $offset );
+    
+    search($channel, $jql, $offset, $max_search_results);
+    
+    return;
+    
+  }
+  
+  # Search for a filter
+  
+  if ($msg =~ m/^!filter\s*(.+)/) {
+    
+    my $jql = 'filter="' . $1 .'"';
+    
+    my $offset = 0;
+    
+    @{$nick_searches{$who}} = ( $jql, $offset );
+    
+    search($channel, $jql, $offset, $max_search_results);
+    
+    return;
+    
+  }
+  
+  # Find (simple search)
+  
+  if ($msg =~ m/^!find\s*(.+)/) {
+    
+    my $query = $1;
+    
+    my $jql = '';
+    
+    my $offset = 0;
+    
+    if ($query =~ s/(^\s*(mc|mcpe|mcapi))\s+//i) {
+      $jql .= "project=$1 & ";
+    }
+    
+    $jql .= 'text~"' . $query . '"';
+    
+    @{$nick_searches{$who}} = ( $jql, $offset );
     
     search($channel, $jql, $offset, $max_search_results);
     
@@ -469,7 +509,12 @@ sub search {
     
   my $json = fetch_json($json_url, $auth{$admin}) or return;
   
-  my @issues = @{$json->{issues}} or return;
+  if ($json->{errorMessages}) {
+    say_to($channel, @{$json->{errorMessages}}[0]);
+    return;
+  }
+  
+  my @issues = @{$json->{issues}} if $json->{issues} or return;
 
   my $total = $json->{total};
   
@@ -647,7 +692,12 @@ sub fetch_json {
   my $json = new JSON; #TODO: make global?
   my $response = !$auth ? http(GET => $url) : 
       http(GET => $url, ( "Authorization: Basic $auth" ));
-  return $json->decode($response);
+      
+  eval {
+    return $json->decode($response);
+  };
+  
+  return @{[]};
 }
 
 # Fetch XML from a URL
