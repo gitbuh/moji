@@ -238,9 +238,9 @@ sub on_msg {
   
   # Start echoing the feed in this channel
   
-  if ($msg =~ m/^!(?:feed|activity)\s*(.*)/) {
+  if ($msg =~ m/^!feed\s*(.*)/) {
   
-    if ($1 =~ m/off/) {
+    if ($1 =~ m/^off$/) {
     
       delete $channels{$channel};
       
@@ -254,7 +254,7 @@ sub on_msg {
     $irc->yield(ctcp => $channel => 
         "ACTION is now reporting activity to $channel.");
         
-    $channels{$channel} = 1;
+    $channels{$channel} = $1 ? $1 : '.';
       
     $tick_interval = $tick_interval_min;
   
@@ -365,7 +365,7 @@ sub on_msg {
 
 sub on_tick {
     
-  my $data = fetch_xml($feed_path);
+  my $data = fetch_xml($feed_path, $auth{$admin});
 
   my $d = $data->{entry}->[0]->{updated};
   
@@ -404,7 +404,15 @@ sub on_tick {
       
       my $msg = "$desc (" . ago($updated) . ") - $link";
       
-      my @targets = keys %channels;
+      my @targets = ();
+      
+      while (my ($channel, $filter) = each %channels) {
+  
+        push @targets, $channel if $desc =~ m/$filter/i;
+        
+      }
+      
+      # my @targets = keys %channels;
       
       # print "$msg\n";
       
@@ -518,13 +526,22 @@ sub search {
 
   my $total = $json->{total};
   
+  my $first = $offset + 1;
+  
+  my $last = $offset + @issues;
+  
   my $bold = chr(0x2);
   my $end = chr(0xf);
+  
+  my $s = $total > 1 ? 's' : '';
+  my $to = $last - $first == 1 ? 'and' : 'through';
         
-  my $msg = $bold . "Showing " . ($offset + 1) . " through " 
-      . ($offset + @issues) . " of $total results for $jql.$end";
+  my $msg = !$total ? "No results for $jql.$end" : 
+      $total <= $limit ? "Showing $total result$s for $jql." :
+      $last == $first ? "Showing result$s $last of $total for $jql." :
+      "Showing result$s $first $to $last of $total for $jql.";
         
-  say_to($channel, $msg);
+  say_to($channel, "$bold$msg$end");
   
   foreach my $issue (@issues) {
     
@@ -609,7 +626,7 @@ sub anti_highlight {
   
   $names =~ s/(\s+)/\|/g; #delimit with pipes
   
-  $text =~ s/\b($names)\b/@{[Acme::Umlautify::umlautify($1)]}/g;
+  $text =~ s/\b($names)\b/@{[Acme::Umlautify::umlautify($1)]}/gi;
   
   return $text;
 
@@ -703,11 +720,13 @@ sub fetch_json {
 
 sub fetch_xml {
 
-  my $xml_url = shift;
+  my ($url, $auth) = @_;
   # setting KeyAttr prevents id elements from becoming keys of parent elements.
   my $xml = new XML::Simple(KeyAttr => 'xxxx'); #TODO: make global?
+  my $response = !$auth ? http(GET => $url) : 
+      http(GET => $url, ( "Authorization: Basic $auth" ));
   eval {
-    return $xml->XMLin(http(GET => $xml_url));
+    return $xml->XMLin($response);
   };
 }
 
