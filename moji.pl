@@ -608,8 +608,21 @@ sub anti_highlight {
   
   $names =~ s/(\s+)/\|/g; #delimit with pipes
   
-  $text =~ s/\b($names)\b/@{[Acme::Umlautify::umlautify($1)]}/gi;
+  $text =~ s/\b($names)\b/@{[mangle($1)]}/gi;
   
+  return $text;
+
+}
+
+
+sub mangle {
+
+  my $text = shift;
+  
+  $text = Acme::Umlautify::umlautify($text);
+  $text =~ s/n/ñ/g;
+  $text =~ s/N/Ñ/g;
+
   return $text;
 
 }
