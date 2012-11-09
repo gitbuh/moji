@@ -107,7 +107,7 @@ sub on_start {
   
   $irc->yield(
     connect => {
-      Nick     => 'moji',
+      Nick     => 'moji`',
       Username => 'Moji',
       Ircname  => 'MojiBot',
       Server   => 'irc.esper.net',
@@ -147,11 +147,12 @@ sub on_msg {
     if ($msg =~ m/^!op\s*(.+)/) {
       
       return $irc->yield(notice => $nick, 
-          "$1 is already an operator.") if $operators{$1};
+          "$1 is already an operator.") 
+          if $operators{$1};
       
       $operators{$1} = $op_rank + 1;
     
-      $irc->yield(ctcp => $channel => 
+      return $irc->yield(ctcp => $channel,
           "ACTION is now accepting operator commands from $1.");
       
     }
@@ -160,30 +161,18 @@ sub on_msg {
   
     if ($msg =~ m/^!deop\s*(.+)/) {
       
-      if (!$operators{$1}) {
+      return $irc->yield(notice => $nick,
+          "$1 isn't an operator.") 
+          if !$operators{$1};
       
-        $irc->yield(notice => $nick => 
-            "$1 isn't an operator.");
+      return $irc->yield(notice => $nick,
+          "Operator rank for $1 equals or exceeds your own.") 
+          if $operators{$1} <= $op_rank;
             
-        return;
-      
-      }
-      
-      if ($operators{$1} <= $op_rank) {
-      
-        $irc->yield(notice => $nick => 
-            "Operator rank for $1 equals or exceeds your own.");
-            
-        return;
-      
-      }
-      
       delete $operators{$1};
       
-      $irc->yield(ctcp => $channel => 
+      return $irc->yield(ctcp => $channel,
           "ACTION is no longer accepting operator commands from $1.");
-          
-      return;
       
     }
     
@@ -244,15 +233,10 @@ sub on_msg {
     
       delete $channels{$channel};
       
-      $irc->yield(ctcp => $channel => 
+      return $irc->yield(ctcp => $channel,
           "ACTION stops reporting activity to $channel.");
-      
-      return;
     
     }
-  
-    $irc->yield(ctcp => $channel => 
-        "ACTION is now reporting activity to $channel.");
         
     $channels{$channel} = $1 ? $1 : '.';
       
@@ -260,7 +244,10 @@ sub on_msg {
   
     $_[KERNEL]->delay(bot_tick => 0);
     
-    return;
+    return $irc->yield(ctcp => $channel,
+        "ACTION is now reporting " 
+        . ($1 ? "activity matching '$1'" : 'all activity')
+        . " to $channel.");
     
   }
   
@@ -393,6 +380,8 @@ sub on_tick {
   
     if ($desc ne $feed_last_desc) {
     
+      $feed_last_desc = $desc;
+    
       my $dp = DateTime::Format::Strptime->new(
           pattern => '%Y-%m-%dT%H:%M:%S');
           
@@ -508,6 +497,8 @@ sub on_user_nick {
 
 }
 
+# Do a JQL search and display results in channel.
+
 sub search {
 
   my ($channel, $jql, $offset, $limit) = @_;
@@ -530,18 +521,19 @@ sub search {
   
   my $last = $offset + @issues;
   
+  my $to = $last - $first == 1 ? 'and' : 'through';
+  
+  my $s = $total > 1 ? 's' : '';
+        
+  my $msg = !$total ? "No results" : 
+      $total <= $limit ? "Showing $total result$s" :
+      $last <= $first ? "Showing result $last of $total" :
+      "Showing results $first $to $last of $total";
+        
   my $bold = chr(0x2);
   my $end = chr(0xf);
   
-  my $s = $total > 1 ? 's' : '';
-  my $to = $last - $first == 1 ? 'and' : 'through';
-        
-  my $msg = !$total ? "No results for $jql.$end" : 
-      $total <= $limit ? "Showing $total result$s for $jql." :
-      $last == $first ? "Showing result$s $last of $total for $jql." :
-      "Showing result$s $first $to $last of $total for $jql.";
-        
-  say_to($channel, "$bold$msg$end");
+  say_to($channel, "$bold$msg for $jql.$end");
   
   foreach my $issue (@issues) {
     
@@ -566,13 +558,9 @@ sub show_issue {
   
   my $url = "$browse_path/" . $issue->{key};
   
-  eval {
-    $comments = @{$issue->{fields}->{comment}->{comments}};
-  };
+  eval { $comments = @{$issue->{fields}->{comment}->{comments}}; };
   
-  eval {
-    $url = shorten_url($url);
-  };
+  eval { $url = shorten_url($url); };
   
   my $out = $issue->{key} . ": " 
       . $issue->{fields}->{summary} 
@@ -611,17 +599,11 @@ sub anti_highlight {
   
   while (my $channel = shift @channel_list) {
     my $nicks = $channel_nicks{$channel};
-    if ($nicks) {
-      $names .= ($names ? ' ' : '') . $nicks;
-    }
+    $names .= ($names ? ' ' : '') . $nicks if $nicks;
   }
   
-  if (!$names) {
+  return $text if !$names;
   
-    return $text;
-  
-  }
-
   $names =~ s/\|/\\|/g; #escape pipes
   
   $names =~ s/(\s+)/\|/g; #delimit with pipes
@@ -694,10 +676,16 @@ sub shorten_url {
   );
   
   my $json = new JSON;
-
-  my $obj = $json->decode($response);
   
-  return $obj->{id};
+  eval {
+
+    my $obj = $json->decode($response);
+    
+    $url = $obj->{id};
+    
+  };
+  
+  return $url;
     
 }
 
@@ -723,11 +711,13 @@ sub fetch_xml {
   my ($url, $auth) = @_;
   # setting KeyAttr prevents id elements from becoming keys of parent elements.
   my $xml = new XML::Simple(KeyAttr => 'xxxx'); #TODO: make global?
+  my $hash = {};
   my $response = !$auth ? http(GET => $url) : 
       http(GET => $url, ( "Authorization: Basic $auth" ));
-  eval {
-    return $xml->XMLin($response);
-  };
+  
+  eval { $hash = $xml->XMLin($response); };
+  
+  return $hash;
 }
 
 # Do http(s) stuff.
@@ -743,10 +733,7 @@ sub http {
       new IO::Socket::SSL("$domain:https") :
       new IO::Socket::INET("$domain:http");
 
-  if (!$socket) { 
-    warn "Can't open socket to $domain over $protocol.\n";
-    return; 
-  }
+  return warn "Can't open socket to $domain over $protocol.\n" if !$socket;
 
   my $length = $body ? length $body : 0;
   
