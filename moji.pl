@@ -407,6 +407,12 @@ sub on_tick {
   
   }
   
+  #TODO: make these global?
+  
+  my $hs = HTML::Strip->new();  
+  
+  my $dp = DateTime::Format::Strptime->new(pattern => '%Y-%m-%dT%H:%M:%S');
+  
   # Show skipped entries to subscribed channels.
   while (--$skipped >= 0) {
       
@@ -414,16 +420,11 @@ sub on_tick {
     
     my $html_desc = $entry->{title}->{content};
     
-    my $hs = HTML::Strip->new();
-    
     my $desc = $hs->parse($html_desc); # strip html tags
    
     # collapse and strip whitespace
     $desc =~ s/\s+/ /g; 
     $desc =~ s/(?:^\s*)|(?:\s*$)//g;  
-    
-    my $dp = DateTime::Format::Strptime->new(
-        pattern => '%Y-%m-%dT%H:%M:%S');
     
     my $updated = $dp->parse_datetime($entry->{updated});
     
@@ -552,6 +553,7 @@ sub search {
       "Showing results $first $to $last of $total";
         
   my $bold = chr(0x2);
+  
   my $end = chr(0xf);
   
   say_to($channel, "$bold$msg for $jql.$end");
@@ -575,18 +577,16 @@ sub show_issue {
 
   my $updated = $dp->parse_datetime($issue->{fields}->{updated});
   
-  my $comments = 0;
+  my $url = shorten_url("$browse_path/" . $issue->{key});
   
-  my $url = "$browse_path/" . $issue->{key};
-  
-  eval { $comments = @{$issue->{fields}->{comment}->{comments}}; };
-  
-  eval { $url = shorten_url($url); };
+  my $comments;
   
   my $out = $issue->{key} . ": " 
       . $issue->{fields}->{summary} 
       . " - " . $issue->{fields}->{status}->{name} 
       . ", updated " . ago($updated);
+  
+  eval { $comments = @{$issue->{fields}->{comment}->{comments}}; };
       
   if ($comments) {
     my $s = $comments > 1 ? 's' : '';
@@ -691,7 +691,6 @@ sub ago {
   return "just now";
 
 }
-
 
 # Shorten a URL using goo.gl
 # https://developers.google.com/url-shortener/v1/getting_started
