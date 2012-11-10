@@ -19,6 +19,7 @@ use POE::Component::IRC;
 use MIME::Base64;
 use Acme::Umlautify;
 
+# Needs at least two arguments
 if (@ARGV < 2) {
 
   print "
@@ -28,6 +29,7 @@ if (@ARGV < 2) {
 
 }
 
+# Get password if not provided as argument
 if (@ARGV < 3) {
 
   print "
@@ -40,6 +42,15 @@ if (@ARGV < 3) {
   print "\n\n";
 
 }
+
+# Bot identifies itself on IRC as:
+my $bot_info = {
+  Nick     => 'moji`',
+  Username => 'Moji',
+  Ircname  => 'MojiBot',
+  Server   => 'irc.esper.net',
+  Port     => '6667',
+};
 
 # JIRA root URL.
 my $root_path = "https://mojang.atlassian.net";
@@ -66,9 +77,11 @@ my $tick_interval_min = 5;
 # Maximum number of seconds between feed checks.
 my $tick_interval_max = 300; 
 
+# Current number of seconds between feed checks.
 my $tick_interval = $tick_interval_min;
-my $feed_updated = ""; 
-my $feed_last_desc = "";
+
+# Date/time string from the last feed massage
+my $feed_last_id = "";
 
 # IRC admin user
 my $admin = $ARGV[0];
@@ -97,23 +110,32 @@ my %nick_searches = ();
 # Set up our IRC "object environment."
 my $irc = POE::Component::IRC->spawn();
 
+# Create and run the POE session.
+
+POE::Session->create(
+  inline_states => {
+    _start      => \&on_start,
+    irc_001     => \&on_connect,
+    irc_353     => \&on_names,
+    irc_join    => \&on_user_joined,
+    irc_part    => \&on_user_parted,
+    irc_nick    => \&on_user_nick,
+    irc_public  => \&on_msg,
+    irc_msg     => \&on_msg,
+    bot_tick    => \&on_tick,
+  },
+);
+
+$poe_kernel->run();
+
+exit 0;
+
 # The bot session has started. Connect to a server.
 
 sub on_start {
-  
   print "Connecting...\n";
-  
   $irc->yield(register => "all");
-  
-  $irc->yield(
-    connect => {
-      Nick     => 'moji`',
-      Username => 'Moji',
-      Ircname  => 'MojiBot',
-      Server   => 'irc.esper.net',
-      Port     => '6667',
-    }
-  );
+  $irc->yield(connect => $bot_info);
 }
 
 # The bot has successfully connected to a server.
@@ -352,18 +374,43 @@ sub on_msg {
 
 sub on_tick {
     
+  return if !%channels;
+    
   my $data = fetch_xml($feed_path, $auth{$admin});
-
-  my $d = $data->{entry}->[0]->{updated};
   
-  # Check if entry 0 has a new timestamp
   # TODO: HEAD request, check Last-Modified header
   
-  if ($d && ($d ne $feed_updated)) {
+  # Display new feed activity...
+    
+  # Count how many entries we skipped
+  my $skipped = 0;
   
-    $feed_updated = $d;
+  for my $entry (@{$data->{entry}}) {
+
+    last if ($entry->{id} eq $feed_last_id);
+    ++$skipped;
+    
+  }
+  
+  # Only show 1 entry if we just started the bot.
+  $skipped = 1 if !$feed_last_id;
+  
+  # If no activity, increase tick interval and return.
+  if (!$skipped) {
+  
+    $tick_interval += $tick_interval_min;
+    
+    $tick_interval = $tick_interval_max 
+        if $tick_interval > $tick_interval_max;
+        
+    return $_[KERNEL]->delay(bot_tick => $tick_interval);
+  
+  }
+  
+  # Show skipped entries to subscribed channels.
+  while (--$skipped >= 0) {
       
-    my $entry = $data->{entry}->[0];
+    my $entry = $data->{entry}->[$skipped];
     
     my $html_desc = $entry->{title}->{content};
     
@@ -375,56 +422,32 @@ sub on_tick {
     $desc =~ s/\s+/ /g; 
     $desc =~ s/(?:^\s*)|(?:\s*$)//g;  
     
-    # Make sure feed description has changed to avoid reporting 
-    # redundant actions (like repeated edits to a description).
-  
-    if ($desc ne $feed_last_desc) {
+    my $dp = DateTime::Format::Strptime->new(
+        pattern => '%Y-%m-%dT%H:%M:%S');
     
-      $feed_last_desc = $desc;
+    my $updated = $dp->parse_datetime($entry->{updated});
     
-      my $dp = DateTime::Format::Strptime->new(
-          pattern => '%Y-%m-%dT%H:%M:%S');
-          
-      my $updated = $dp->parse_datetime($d);
-      
-      my $link = $entry->{link}->[0]->{href};
-      
-      eval { $link = shorten_url($link); };
-      
-      my $msg = "$desc (" . ago($updated) . ") - $link";
-      
-      my @targets = ();
-      
-      while (my ($channel, $filter) = each %channels) {
-  
-        push @targets, $channel if $desc =~ m/$filter/i;
-        
-      }
-      
-      # my @targets = keys %channels;
-      
-      # print "$msg\n";
-      
-      say_to(join(',', @targets), $msg);
+    my $link = shorten_url($entry->{link}->[0]->{href});
     
+    my @targets = ();
+    
+    my $msg = "$desc (" . ago($updated) . ") - $link";
+    
+    while (my ($channel, $filter) = each %channels) {
+
+      push @targets, $channel if $desc =~ m/$filter/i;
+      
     }
     
-    # Reset tick interval to the minimum
+    say_to((join ',', @targets), $msg);
     
-    $tick_interval = $tick_interval_min;
-  
-  } else {
-  
-    # Increase tick interval
-  
-    $tick_interval += $tick_interval_min;
-    
-    $tick_interval = $tick_interval_max 
-        if $tick_interval > $tick_interval_max;
-  
   }
+  
+  $feed_last_id = $data->{entry}->[0]->{id};
+  
+  $tick_interval = $tick_interval_min;
    
-  $_[KERNEL]->delay(bot_tick => $tick_interval) if %channels;
+  $_[KERNEL]->delay(bot_tick => $tick_interval);
   
 }
 
@@ -444,8 +467,6 @@ sub on_names {
   
 }
 
-
-  
 # Someone joined a channel that we're on. 
 # ARG0 is the person's nick!hostmask. ARG1 is the channel name.
   
@@ -614,6 +635,7 @@ sub anti_highlight {
 
 }
 
+# Dots and squiggles
 
 sub mangle {
 
@@ -771,23 +793,3 @@ sub http {
   return $response;
 
 }
-
-# Create and run the POE session.
-
-POE::Session->create(
-  inline_states => {
-    _start      => \&on_start,
-    irc_001     => \&on_connect,
-    irc_353     => \&on_names,
-    irc_join    => \&on_user_joined,
-    irc_part    => \&on_user_parted,
-    irc_nick    => \&on_user_nick,
-    irc_public  => \&on_msg,
-    irc_msg     => \&on_msg,
-    bot_tick    => \&on_tick,
-  },
-);
-
-$poe_kernel->run();
-
-exit 0;
