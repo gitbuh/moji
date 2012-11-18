@@ -4,64 +4,146 @@ use strict;
 use warnings;
 
 use Moji::IRC;
-use Moji::Opt;
-use POE;
 
 # use Data::Dumper;
 
-sub enable {
-  my $class = shift;
+our $plugins = { };
+our @plugin_names = ( );
+
+# Static methods
+
+sub load {
+
+  my @names = @_;
+
+  for my $name (@names) {
   
-  my $plugin = bless { }, $class;
-  my $commands = $plugin->get_commands();
-  my $states = $plugin->get_states();
+    if (!$plugins->{$name}) {
   
-  print "enabling $class\n";
-  
-  while (my ($cmd, $fn) = each %$commands) {
-   
-    print "[c] $cmd\n";
-  
-    $bot_commands->{$cmd} = $fn;
+      my $module = "Moji::Plugin::$name";
+      require "Moji/Plugin/$name.pm";
+      $module->import();
+      $plugins->{$name} = (bless { name => $name }, $module);
+      push @plugin_names, $name;
+    
+    }
     
   }
+  
+  return $plugins;
+  
+}
+
+sub setup_all {
+  for my $name (@plugin_names) { $plugins->{$name}->setup(); }
+}
+
+sub teardown_all {
+  for my $name (@plugin_names) { $plugins->{$name}->teardown(); }
+}
+
+sub enable_all {
+  for my $name (@plugin_names) { $plugins->{$name}->enable(); }
+}
+
+sub disable_all {
+  for my $name (@plugin_names) { $plugins->{$name}->disable(); }
+}
+
+
+sub get_all { 
+
+  my $what = shift;
+  
+  my $get_things = "get_$what";
+
+  my %all = ( );
+  
+  while (my ($name, $plugin) = each %$plugins) {
+  
+    next if !($plugin->{enabled} && $plugin->$get_things);
+  
+    my $things = $plugin->$get_things();
+    
+    my %everything = (%all, %$things);
+    
+    %all = %everything;
+  
+  }
+
+  return \%all;
+  
+}
+
+# Instance methods, override these as needed
+
+sub on_setup { };
+sub on_teardown { };
+sub on_enable { };
+sub on_disable { };
+
+sub get_commands { return { }; }
+sub get_states { return { }; }
+sub get_responders { return { }; }
+sub get_transformers { return { }; }
+
+# Instance methods
+
+sub setup { 
+
+  my $self = shift;
+  
+  $self->on_setup(); 
+  
+}
+
+sub teardown { 
+
+  my $self = shift;
+  
+  $self->on_teardown(); 
+  
+}
+
+sub enable {
+
+  my $self = shift;
+
+  return if $self->{enabled};
+  
+  $self->{enabled} = 1;
+
+  my $states = $self->get_states();
   
   while (my ($state, $fn) = each %$states) {
     
-    print "[s] $state\n";
-   
     $bot_states->{$state} = $fn;
     
   }
+  
+  $self->on_enable(); 
+ 
  
 }
 
 sub disable {
 
-  my $module = shift;
+  my $self = shift;
+
+  return if !$self->{enabled};
   
-  print "disabling $module\n";
+  $self->{enabled} = 0;
   
-  while (my ($cmd, $fn) = each %$module::commands) {
-   
-    print "... $cmd\n";
+  my $states = $self->get_states();
   
-    delete $bot_commands->{$cmd};
-    
-  }
-  
-  while (my ($state, $fn) = each %$module::states) {
-   
-    print "... $state\n";
+  while (my ($state, $fn) = each %$states) {
     
     delete $bot_states->{$state};
     
   }
   
+  $self->on_disable(); 
+
 }
-
-sub get_commands { return { }; }
-sub get_states { return { }; }
-
 
 1;

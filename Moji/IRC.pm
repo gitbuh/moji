@@ -5,8 +5,7 @@ use warnings;
 
 require Exporter;
 our @ISA         = qw/ Exporter /;
-our @EXPORT   = qw/ $irc $bot_commands $bot_states say_to /;
-
+our @EXPORT   = qw/ $irc $bot_states say_to /;
 
 use Moji::Jira;
 use Moji::Net;
@@ -18,23 +17,17 @@ use Acme::Umlautify;
 
 our $irc = POE::Component::IRC->spawn();
 
+use Data::Dumper;
+
+# Things for plugins to populate
+
+# POE states (IRC or other)
 our $bot_states = {
   _start      => \&on_start,
   irc_001     => \&on_connect,
-  irc_353     => \&on_names,
-  irc_join    => \&on_user_joined,
-  irc_part    => \&on_user_parted,
-  irc_nick    => \&on_user_nick,
   irc_public  => \&on_msg,
   irc_msg     => \&on_msg,
 };
-
-# Who is in the channels? Use this to anti-highlight.
-# Keys are channel names, values are space-delimited lists of nicks. 
-our $channel_nicks = {}; 
-
-# All available commands.
-our $bot_commands = {}; 
 
 sub run {
 
@@ -72,182 +65,41 @@ sub on_msg {
   
   print " [$ts] <$nick:$channel> $msg\n";
   
-  my $cmdlist = join '|', keys %$bot_commands; 
-  
-  my $re = "($cmdlist)";
-  
   # Look for matching commands
   
-  if ($msg =~ m/\!($cmdlist)\s*(.*)/ig) {
+  my $commands = Moji::Plugin::get_all('commands');
   
-    print "lst: $cmdlist\ncmd: $1\nargs: $2\n";
+  my $cmdlist = join '|', keys %$commands; 
   
-    # Run the command
-    return $bot_commands->{$1}($2, $nick, $channel, $kernel);
+  if ($cmdlist && $msg =~ m/\!($cmdlist)\s*(.*)/ig) {
+  
+    return $commands->{$1}($2, $nick, $channel, $kernel);
     
   }
   
-  # Auto-link ticket keys
-  #TODO: move this to a plugin
+  # Run autoresponders
   
-  while ($msg =~ m/((?:mc|mcpe|mcapi)-\d+)/ig) {
-
-    my $url = "${Moji::Opt::json_path}/issue/$1";
-    
-    my $issue = get_json($url, ${Moji::Opt::jira_credentials});
-    
-    say_to($channel, format_issue($issue));
-   
+  my $responders = Moji::Plugin::get_all('responders');
+  
+  for my $fn (sort keys %$responders) {
+    return if $responders->{$fn}($msg, $nick, $channel, $kernel);
   }
   
-}
-
-# We got a list of nicks in a channel (irc_353). 
-
-sub on_names {
-
-  my ($kernel, $server, $response) = @_[KERNEL, ARG0, ARG1];
-  my ($channel, $nicks) = $response =~ m/(#[^\s]+)\s*:(.*)/;
-  
-  $nicks =~ s/[~&@%+]//g; #strip prefixes from names
-  set_nicks($nicks, $channel);
-  
-}
-
-# Someone joined a channel that we're on. 
-# ARG0 is the person's nick!hostmask. ARG1 is the channel name.
-  
-sub on_user_joined {
-
-  my ($kernel, $who, $channel) = @_[KERNEL, ARG0, ARG1];
-  my $nick = (split /!/, $who)[0];
-  
-  add_nick($nick, $channel);
-  
-}
-
-# Someone left a channel that we're on. 
-# ARG0 is the person's nick!hostmask. ARG1 is the channel name.
-  
-sub on_user_parted {
-
-  my ($kernel, $who, $channel) = @_[KERNEL, ARG0, ARG1];
-  my $nick = (split /!/, $who)[0];
-  
-  remove_nick($nick, $channel);
-
-}
-
-# Someone changed their nick. 
-# ARG0 is the person's nick!hostmask. ARG1 is the new nick.
-  
-sub on_user_nick {
-
-  my ($kernel, $who, $new_nick) = @_[KERNEL, ARG0, ARG1];
-  my $nick = (split /!/, $who)[0];
-  
-  change_nick($nick, $new_nick);
-
-}
-
-sub set_nicks {
-
-  my ($nicks, $channel) = @_;
-  
-  print "Got users for $channel: $nicks\n";
-  
-  $channel_nicks->{$channel} = $nicks;
-
-}
-
-sub add_nick {
-
-  my ($nick, $channel) = @_;
-   
-  $channel_nicks->{$channel} = "" if !$channel_nicks->{$channel};
-  
-  $channel_nicks->{$channel} .= 
-      ($channel_nicks->{$channel} ? ' ' : '') . $nick;
-      
-  print "$nick joined $channel -> " . $channel_nicks->{$channel} . "\n";
-
-}
-
-sub remove_nick {
-
-  my ($nick, $channel) = @_;
-  
-  $channel_nicks->{$channel} = "" if !$channel_nicks->{$channel};
-  $channel_nicks->{$channel} =~ s/\s*\b\Q$nick\E\b//g;
-  $channel_nicks->{$channel} =~ s/\s+$//;
-  
-  print "$nick parted $channel -> " . $channel_nicks->{$channel} . "\n";
-
-}
-
-sub change_nick {
-
-  my ($nick, $new_nick) = @_;
-  
-  while (my ($channel, $nicks) = each %$channel_nicks) {
-  
-    $channel_nicks->{$channel} =~ s/\b\Q$nick\E\b/$new_nick/g;
-    
-    print "$nick renamed to $new_nick -> " . $channel_nicks->{$channel} . "\n";
-    
-  }
-
 }
 
 # Send some text to a comma-delimited list of channels/users.
 
 sub say_to {
 
-  my ($channel, $text) = @_;
+  my ($who, $message) = @_;
   
-  $irc->yield(privmsg => $channel, anti_highlight($channel, $text));
-
-}
-
-# Search channels for IRC nicks that also occur in the message.
-# Mangle message so it no longer contains the nicks.
-
-sub anti_highlight {
-
-  my ($channels, $text) = @_;
+  my $transformers = Moji::Plugin::get_all('transformers');
   
-  my @channel_list = split ',', $channels;
-  
-  my $names = "";
-  
-  while (my $channel = shift @channel_list) {
-    my $nicks = $channel_nicks->{$channel};
-    $names .= ($names ? ' ' : '') . $nicks if $nicks;
+  for my $fn (sort keys %$transformers) {
+    $message = $transformers->{$fn}($who, $message);
   }
   
-  return $text if !$names;
-  
-  $names =~ s/\|/\\|/g; #escape pipes
-  
-  $names =~ s/(\s+)/\|/g; #delimit with pipes
-  
-  $text =~ s/\b($names)\b/@{[mangle($1)]}/gi;
-  
-  return $text;
-
-}
-
-# Dots and squiggles
-
-sub mangle {
-
-  my $text = shift;
-  
-  $text = Acme::Umlautify::umlautify($text);
-  $text =~ s/n/ñ/g;
-  $text =~ s/N/Ñ/g;
-
-  return $text;
+  $irc->yield(privmsg => ($who, $message));
 
 }
 

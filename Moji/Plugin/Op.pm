@@ -17,8 +17,7 @@ use POE;
 our $operators;
 
 
-sub enable {
-  Moji::Plugin::enable(shift);
+sub on_enable {
   $operators = {${Moji::Opt::op_nick} => 1};
 }
 

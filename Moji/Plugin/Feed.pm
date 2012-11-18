@@ -6,6 +6,7 @@ use warnings;
 use Moji::Plugin;
 our @ISA = qw/ Moji::Plugin /;
 
+use HTML::Strip;
 use Moji::IRC;
 use Moji::Net;
 use Moji::Opt;

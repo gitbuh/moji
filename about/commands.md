@@ -4,7 +4,7 @@ An IRC bot for Mojirans.
 
 ## Commands ##
 
-The bot composed of plugins, which expose commands.
+The bot is composed of plugins, which expose commands.
 
 ### Feed ###
 
@@ -30,5 +30,5 @@ Search for tickets in the JIRA.
 
 ### Op ###
 
-Bot operator commands. These are currently undocumented; see the [source](#file_moji/plugin/op.pm).
-
+Bot operator commands. These are currently undocumented; 
+see the [source](#file_moji/plugin/op.pm).

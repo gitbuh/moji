@@ -5,7 +5,7 @@ use warnings;
 
 require Exporter;
 our @ISA         = qw/ Exporter /;
-our @EXPORT   = qw/ search_issues format_issue /;
+our @EXPORT   = qw/ search_issues get_issue format_issue /;
 
 use Moji::Net;
 use Moji::Time;
@@ -51,6 +51,18 @@ sub search_issues {
   
   return $result;
       
+}
+
+# get issue
+
+sub get_issue {
+
+  my $key = shift;
+
+  my $url = "${Moji::Opt::json_path}/issue/$key";
+  
+  return get_json($url, ${Moji::Opt::jira_credentials});
+  
 }
 
 # format issue
