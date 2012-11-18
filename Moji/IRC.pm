@@ -65,25 +65,10 @@ sub on_msg {
   
   print " [$ts] <$nick:$channel> $msg\n";
   
-  # Look for matching commands
+  # Run commands and responders
   
-  my $commands = Moji::Plugin::get_all('commands');
-  
-  my $cmdlist = join '|', keys %$commands; 
-  
-  if ($cmdlist && $msg =~ m/\!($cmdlist)\s*(.*)/ig) {
-  
-    return $commands->{$1}($2, $nick, $channel, $kernel);
-    
-  }
-  
-  # Run autoresponders
-  
-  my $responders = Moji::Plugin::get_all('responders');
-  
-  for my $fn (sort keys %$responders) {
-    return if $responders->{$fn}($msg, $nick, $channel, $kernel);
-  }
+  return if Moji::Plugin::run_commands($msg, $nick, $channel);
+  return if Moji::Plugin::run_responders($msg, $nick, $channel);
   
 }
 
@@ -93,7 +78,7 @@ sub say_to {
 
   my ($who, $message) = @_;
   
-  my $transformers = Moji::Plugin::get_all('transformers');
+  my $transformers = Moji::Plugin::get_enabled('transformers');
   
   for my $fn (sort keys %$transformers) {
     $message = $transformers->{$fn}($who, $message);

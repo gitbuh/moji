@@ -11,30 +11,36 @@ use Moji::Jira;
 use Moji::Net;
 use Moji::Opt;
 
-sub get_responders {
-  
-  return { R1001 => \&respond };
-  
-}
+sub setup { 
 
-sub respond {
-  
-  my ($msg, $nick, $channel, $kernel) = @_;
-  
-  my $responded = 0;
+  return {
 
-  while ($msg =~ m/((?:mc|mcpe|mcapi)-\d+)/ig) {
+    responders => {
     
-    my $issue = get_issue($1);
+      R1001 => sub {
     
-    say_to($channel, format_issue($issue));
+        my ($msg, $nick, $channel, $kernel) = @_;
+        
+        my $responded = 0;
 
-    $responded = 1;
-   
-  }
-  
-  return $responded;
-  
+        while ($msg =~ m/((?:mc|mcpe|mcapi)-\d+)/ig) {
+          
+          my $issue = get_issue($1);
+          
+          say_to($channel, format_issue($issue));
+
+          $responded = 1;
+         
+        }
+        
+        return $responded;
+        
+      },
+    
+    },
+    
+  };
+
 }
 
 1;

@@ -15,88 +15,92 @@ use POE;
 # Who searched for what? 
 our $nick_searches = {}; 
 
-sub get_commands {
+sub setup { 
 
   return {
-    
-    # Search for tickets using JQL
 
-    search => sub {
-      my ($jql, $nick, $channel) = @_;
+    commands => {
       
-      my $offset = 0;
-      
-      @{$nick_searches->{$nick}} = ( $jql, $offset );
-      
-      search($channel, $jql, $offset, ${Moji::Opt::max_search_results});
+      # Search for tickets using JQL
 
-    },
-
-    # Search for a filter
-
-    filter => sub {
-      my ($args, $nick, $channel) = @_;
-      
-      my $jql = 'filter="' . $args .'"';
-      
-      my $offset = 0;
-      
-      @{$nick_searches->{$nick}} = ( $jql, $offset );
-      
-      search($channel, $jql, $offset, ${Moji::Opt::max_search_results});
-
-    },
-
-    # Find (simple search)
-
-    find => sub {
-      my ($query, $nick, $channel) = @_;
-      
-      my $jql = '';
-      
-      my $offset = 0;
-      
-      if ($query =~ s/(^\s*(mc|mcpe|mcapi))\s+//i) {
-        $jql .= "project=$1 & ";
-      }
-      
-      $jql .= 'text~"' . $query . '"';
-      
-      @{$nick_searches->{$nick}} = ( $jql, $offset );
-      
-      search($channel, $jql, $offset, ${Moji::Opt::max_search_results});
-      
-      return;
-
-    },
-
-    # Show the next page of search results
-
-    more => sub {
-      my ($args, $nick, $channel) = @_;
+      search => sub {
+        my ($jql, $nick, $channel) = @_;
         
-      return if !$nick_searches->{$nick};
-      
-      $nick_searches->{$nick}[1] += ${Moji::Opt::max_search_results};
-      
-      my ($jql, $offset) = @{$nick_searches->{$nick}};
-      
-      search($channel, $jql, $offset, ${Moji::Opt::max_search_results});
-      
-      return;
-      
-    },
-
-    # Show link to bot's source
-
-    source => sub {
-      my ($args, $nick, $channel) = @_;
+        my $offset = 0;
         
-      my $url = ${Moji::Opt::bot_source_url};
-      my $blue = chr(0x3) . 2;
-      my $end = chr(0xf);
-      
-      say_to($channel, "My source code is available at $blue$url$end");
+        @{$nick_searches->{$nick}} = ( $jql, $offset );
+        
+        search($channel, $jql, $offset, ${Moji::Opt::max_search_results});
+
+      },
+
+      # Search for a filter
+
+      filter => sub {
+        my ($args, $nick, $channel) = @_;
+        
+        my $jql = 'filter="' . $args .'"';
+        
+        my $offset = 0;
+        
+        @{$nick_searches->{$nick}} = ( $jql, $offset );
+        
+        search($channel, $jql, $offset, ${Moji::Opt::max_search_results});
+
+      },
+
+      # Find (simple search)
+
+      find => sub {
+        my ($query, $nick, $channel) = @_;
+        
+        my $jql = '';
+        
+        my $offset = 0;
+        
+        if ($query =~ s/(^\s*(mc|mcpe|mcapi))\s+//i) {
+          $jql .= "project=$1 & ";
+        }
+        
+        $jql .= 'text~"' . $query . '"';
+        
+        @{$nick_searches->{$nick}} = ( $jql, $offset );
+        
+        search($channel, $jql, $offset, ${Moji::Opt::max_search_results});
+        
+        return;
+
+      },
+
+      # Show the next page of search results
+
+      more => sub {
+        my ($args, $nick, $channel) = @_;
+          
+        return if !$nick_searches->{$nick};
+        
+        $nick_searches->{$nick}[1] += ${Moji::Opt::max_search_results};
+        
+        my ($jql, $offset) = @{$nick_searches->{$nick}};
+        
+        search($channel, $jql, $offset, ${Moji::Opt::max_search_results});
+        
+        return;
+        
+      },
+
+      # Show link to bot's source
+
+      source => sub {
+        my ($args, $nick, $channel) = @_;
+          
+        my $url = ${Moji::Opt::bot_source_url};
+        my $blue = chr(0x3) . 2;
+        my $end = chr(0xf);
+        
+        say_to($channel, "My source code is available at $blue$url$end");
+
+      },
 
     },
 

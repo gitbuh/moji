@@ -15,21 +15,27 @@ use POE;
 # Keys are channel names, values are space-delimited lists of nicks. 
 our $channel_nicks = {}; 
 
-sub get_states {
+sub setup { 
 
   return {
-    irc_353     => \&on_names,
-    irc_join    => \&on_user_joined,
-    irc_part    => \&on_user_parted,
-    irc_nick    => \&on_user_nick,
+
+    states => {
+    
+      irc_353     => \&on_names,
+      irc_join    => \&on_user_joined,
+      irc_part    => \&on_user_parted,
+      irc_nick    => \&on_user_nick,
+    
+    },
+    
+    transformers => { 
+    
+      T1001 => \&anti_highlight 
+      
+    },
+
   };
   
-}
-
-sub get_transformers {
-  
-  return { T1001 => \&anti_highlight };
-
 }
 
 # We got a list of nicks in a channel (irc_353). 
@@ -128,8 +134,6 @@ sub change_nick {
   }
 
 }
-
-
 
 # Search channels for IRC nicks that also occur in the message.
 # Mangle message so it no longer contains the nicks.

@@ -3,6 +3,8 @@ package Moji::Opt;
 use strict;
 use warnings;
 
+use MIME::Base64;
+
 # Bot identifies itself on IRC as:
 our $bot_info = {
   Nick     => 'moji`',
@@ -42,5 +44,36 @@ our $op_nick;
 
 #base64-encoded JIRA username:password (passed in at runtime)
 our $jira_credentials;
+
+
+# Needs at least two arguments
+if (@ARGV < 2) {
+
+  print "
+    IRC bot operator nick and JIRA user name are required.
+    usage: $0 <op_nick> <jira_username> [jira_password]\n\n";
+  exit 1;
+
+}
+
+# Get password if not provided as argument
+if (@ARGV < 3) {
+
+  print "
+    Enter your JIRA password: ";
+    
+  system('stty','-echo');
+  $ARGV[2] = <STDIN>;
+  system('stty','echo');
+  
+  print "\n\n";
+
+}
+
+# IRC admin user
+$op_nick = $ARGV[0];
+
+#base64-encoded JIRA username:password
+$jira_credentials = encode_base64($ARGV[1] . ':' . $ARGV[2]);
 
 1;
