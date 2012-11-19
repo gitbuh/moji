@@ -60,7 +60,7 @@ sub setup {
         my ($args, $nick, $channel) = @_;
         return if !$operators->{$nick};
         if ($args =~ m/^([^\s]+)\s*(.*)/) {
-          say_to($irc, $1, $2);
+          say_to($1, $2);
           return;
         }
       },

@@ -13,11 +13,8 @@ use Moji::Opt;
 
 use POE;
 use POE::Component::IRC;
-use Acme::Umlautify;
 
 our $irc = POE::Component::IRC->spawn();
-
-use Data::Dumper;
 
 # Things for plugins to populate
 
@@ -75,17 +72,9 @@ sub on_msg {
 # Send some text to a comma-delimited list of channels/users.
 
 sub say_to {
-
   my ($who, $message) = @_;
-  
-  my $transformers = Moji::Plugin::get_enabled('transformers');
-  
-  for my $fn (sort keys %$transformers) {
-    $message = $transformers->{$fn}($who, $message);
-  }
-  
+  $message = Moji::Plugin::run_transformers($who, $message);
   $irc->yield(privmsg => ($who, $message));
-
 }
 
 1;

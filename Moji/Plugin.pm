@@ -118,7 +118,15 @@ sub run_states {
         && $plugin->{states}->{$state} 
         && $plugin->{enabled};
   }
-  
+}
+
+sub run_transformers {
+  my ($who, $message) = @_;
+  my $transformers = get_enabled('transformers');
+  for my $fn (sort keys %$transformers) {
+    $message = $transformers->{$fn}($who, $message);
+  }
+  return $message;
 }
 
 # Instance methods, override these as needed

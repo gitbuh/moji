@@ -7,12 +7,7 @@ use warnings;
 use strict;
 
 use Moji::IRC;    # IRC helper, mostly for anti-highlighting.
-use Moji::Opt;    # Options and settings.
 use Moji::Plugin; # Plugins.
-
-use MIME::Base64;
-
-
 
 #autoload plugins from Moji::Plugin namespace
 
