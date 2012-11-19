@@ -1,4 +1,4 @@
-package Moji::Plugin::Op;
+package Moji::Plugin::Admin;
 
 use strict;
 use warnings;
