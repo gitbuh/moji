@@ -27,9 +27,13 @@ sub setup {
           
           my $issue = get_issue($1);
           
-          say_to($channel, format_issue($issue));
+          eval { 
+          
+            say_to($channel, format_issue($issue));
 
-          $responded = 1;
+            $responded = 1;
+          
+          };
          
         }
         

@@ -21,15 +21,18 @@ sub load {
     next if $plugins->{$name};
   
     my $module = "Moji::Plugin::$name";
+    
+    print "Loading $module\n";
+      
     require "Moji/Plugin/$name.pm";
     $module->import();
     my $plugin = $module->setup();
     
-    print Dumper($plugin);
-    
     $plugin->{name} = $name;
     $plugins->{$name} = bless $plugin, $module;
     push @plugin_names, $name;
+    
+    print Dumper($plugin);
     
   }
   
@@ -44,8 +47,6 @@ sub load_all {
   while (my $plugin = readdir(PLUGINS)) {
 
     if ($plugin =~ s/(.+)\.pm$/$1/) {
-    
-      print "Autoloading $plugin\n";
     
       load($plugin);
     
@@ -68,6 +69,52 @@ sub disable_all {
 sub destroy_all {
   for my $name (@plugin_names) { $plugins->{$name}->destroy(); }
 }
+
+
+sub run_all {
+
+  return _run(
+    fn => shift, 
+    return_many => wantarray, 
+    args => @_
+  );
+
+}
+
+sub run_some {
+
+  return _run(
+    fn => shift, 
+    return_many => wantarray, 
+    return_early => 1, 
+    args => @_
+  );
+
+}
+
+sub _run {
+
+  my %args = @_;
+  my $fn = $args{fn} or return;
+  my $last_result = $args{args}[0];
+  my @results = ( );
+
+  while (my ($name, $plugin) = each %$plugins) {
+    
+    next if !($plugin->{$fn} && $plugin->{enabled}); 
+  
+    $last_result = $plugin->{$fn}($last_result, $args{args});
+    
+    push @results, $last_result if $args{return_many};
+    
+    return $last_result if $args{return_early} && $last_result;
+  
+  }
+  
+  return $args{return_many} ? @results : $last_result;
+
+}
+
 
 sub get_all { return get_some(shift); }
 

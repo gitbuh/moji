@@ -32,7 +32,7 @@ sub shorten_url {
   
   my $response = http(
     POST => 'https://www.googleapis.com/urlshortener/v1/url', 
-    ( "Content-Type: application/json" ),
+    [ "Content-Type: application/json" ],
     $data
   );
   
@@ -53,9 +53,9 @@ sub shorten_url {
 sub get_json {
 
   my ($url, $auth) = @_;
-  my $hash = {};
+  my $hash = 0;
   my $response = !$auth ? http(GET => $url) : 
-      http(GET => $url, ( "Authorization: Basic $auth" ));
+      http(GET => $url, [ "Authorization: Basic $auth" ]);
       
   eval { $hash = $json->decode($response) };
   
@@ -69,7 +69,7 @@ sub get_xml {
   my ($url, $auth) = @_;
   my $hash = {};
   my $response = !$auth ? http(GET => $url) : 
-      http(GET => $url, ( "Authorization: Basic $auth" ));
+      http(GET => $url, [ "Authorization: Basic $auth" ]);
   
   eval { $hash = $xml->XMLin($response); };
   
@@ -95,12 +95,14 @@ sub http {
   
   my $br = "\r\n"; # nothing to see here...
   
-  my $header_data = $headers ? $br . join $br, $headers : '';
+  my $header_data = $headers ? $br . join $br, @$headers : '';
   
   my $request = "$action $url HTTP/1.0$header_data$br"
       . ($length ? "Content-Length: $length$br$br$body" : $br);
   
   my $response;
+  
+  # print "Request:\n\n$request\n\n";
     
   print $socket $request;
   
@@ -108,6 +110,8 @@ sub http {
   $socket->read($response);  
   
   close $socket;
+  
+  # print "Response:\n\n$response\n\n";
   
   $response =~ s/.*$br$br//ms; # strip the headers from the response
   
