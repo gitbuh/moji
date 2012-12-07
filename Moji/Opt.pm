@@ -7,7 +7,7 @@ use MIME::Base64;
 
 # Bot identifies itself on IRC as:
 our $bot_info = {
-  Nick     => 'moji`',
+  Nick     => 'moji2',
   Username => 'Moji',
   Ircname  => 'MojiBot',
   Server   => 'irc.esper.net',

@@ -13,6 +13,24 @@ use Moji::Opt;
 
 sub setup { 
 
+  # get available projects
+
+  my @projects = ();
+  
+  my $url = "${Moji::Opt::json_path}/project";
+  
+  my $a = get_json($url, ${Moji::Opt::jira_credentials});
+  
+  for my $obj (@{$a}) {
+
+    push @projects, $obj->{key};
+    
+  }
+  
+  my $project_names = join '|', @projects;
+  
+  print "using projects: $project_names\n";  
+
   return {
 
     responders => {
@@ -23,7 +41,7 @@ sub setup {
         
         my $responded = 0;
 
-        while ($msg =~ m/((?:mc|mcpe|mcapi)-\d+)/ig) {
+        while ($msg =~ m/((?:$project_names)-\d+)/ig) {
           
           my $issue = get_issue($1);
           

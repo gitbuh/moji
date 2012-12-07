@@ -14,7 +14,7 @@ use POE;
 # Someone needs to be able to control the bot.
 # !op <nick> to add more operators.
 # !deop <nick> to remove operators.
-our $operators;
+our $operators = { };
 
 sub setup { 
 
@@ -42,7 +42,7 @@ sub setup {
         return if !$operators->{$nick};
         
         return $irc->yield(notice => $nick,
-            "$1 isn't an operator.") 
+            "$op isn't an operator.") 
             if !$operators->{$op};
         
         return $irc->yield(notice => $nick,
