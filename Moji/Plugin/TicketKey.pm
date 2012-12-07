@@ -41,7 +41,7 @@ sub setup {
         
         my $responded = 0;
 
-        while ($msg =~ m/((?:$project_names)-\d+)/ig) {
+        while ($msg =~ m/\b((?:$project_names)-\d+\b)/ig) {
           
           my $issue = get_issue($1);
           
