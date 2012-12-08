@@ -27,7 +27,7 @@ our $json_path = "$root_path/rest/api/latest";
 our $feed_path = "$root_path/activity";
 
 # Bot can tell us where to find its source, not used for anything else.
-our $bot_source_url = "https://gist.github.com/3977511";
+our $bot_source_url = "https://github.com/gitbuh/moji";
 
 # For !search command
 our $max_search_results = 5;
