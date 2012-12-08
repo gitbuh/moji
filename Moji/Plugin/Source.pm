@@ -9,9 +9,6 @@ our @ISA = qw/ Moji::Plugin /;
 use Moji::Opt;
 use Moji::IRC;
 
-# Who searched for what? 
-our $nick_searches = {}; 
-
 sub setup { 
 
   return {
