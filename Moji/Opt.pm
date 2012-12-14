@@ -5,7 +5,17 @@ use warnings;
 
 use MIME::Base64;
 
-# Bot identifies itself on IRC as:
+
+# positional command line arguments
+
+use constant OPT_IRC_OP => 0;
+use constant OPT_JIRA_NAME => 1;
+use constant OPT_JIRA_PASS => 2;
+use constant OPT_IRC_NICK => 3;
+use constant OPT_IRC_USER => 4;
+use constant OPT_IRC_PASS => 5;
+
+# Bot default identification:
 our $bot_info = {
   Nick     => 'moji2',
   Username => 'Moji',
@@ -42,38 +52,124 @@ our $tick_interval_max = 300;
 # IRC admin user (passed in at runtime)
 our $op_nick;
 
+# Bot IRC nick (passed in at runtime)
+our $irc_nick;
+
+# Bot IRC user (passed in at runtime)
+our $irc_user;
+
+# Bot IRC password (passed in at runtime)
+our $irc_pass;
+
+
 #base64-encoded JIRA username:password (passed in at runtime)
 our $jira_credentials;
 
-
 # Needs at least two arguments
-if (@ARGV < 2) {
+if (@ARGV <= OPT_JIRA_NAME) {
 
   print "
-    IRC bot operator nick and JIRA user name are required.
-    usage: $0 <op_nick> <jira_username> [jira_password]\n\n";
-  exit 1;
+    usage: $0 <op_nick> <jira_username> [jira_password] [irc_nick] [irc_user irc_pass]\n\n";
 
 }
+
+# Get operator irc nick if not provided as argument
+if (@ARGV <= OPT_IRC_OP) {
+
+  print "
+Enter the bot operator's IRC nick: ";
+    
+  chomp ($ARGV[OPT_IRC_OP] = <STDIN>);
+  $ARGV[OPT_IRC_OP] or die "Operator nick is required";
+  
+  print "\n";
+
+}
+print 'Operator:  '. $ARGV[OPT_IRC_OP] . "\n"; 
+
+
+# Get username if not provided as argument
+if (@ARGV <= OPT_JIRA_NAME) {
+
+  print "
+Enter your JIRA username: ";
+    
+  chomp ($ARGV[OPT_JIRA_NAME] = <STDIN>);
+  $ARGV[OPT_JIRA_NAME] or die "JIRA username is required";
+  
+  print "\n";
+
+}
+print 'JIRA user: '. $ARGV[OPT_JIRA_NAME] . "\n"; 
+
 
 # Get password if not provided as argument
-if (@ARGV < 3) {
+if (@ARGV <= OPT_JIRA_PASS) {
 
   print "
-    Enter your JIRA password: ";
+Enter your JIRA password: ";
     
   system('stty','-echo');
-  $ARGV[2] = <STDIN>;
+  chomp ($ARGV[OPT_JIRA_PASS] = <STDIN>);
   system('stty','echo');
+  $ARGV[OPT_JIRA_PASS] or die "JIRA password is required";
   
-  print "\n\n";
+  print "\n";
 
 }
 
-# IRC admin user
-$op_nick = $ARGV[0];
+# Get bot's irc nick if not provided as argument
+if (@ARGV <= OPT_IRC_NICK) {
 
-#base64-encoded JIRA username:password
-$jira_credentials = encode_base64($ARGV[1] . ':' . $ARGV[2]);
+  print "
+Enter the bot's IRC nick (leave blank for \"$bot_info->{Nick}\"): ";
+    
+  chomp ($ARGV[OPT_IRC_NICK] = <STDIN>);
+  $ARGV[OPT_IRC_NICK] or $ARGV[OPT_IRC_NICK] = $bot_info->{Nick};
+  
+  print "\n";
+
+}
+print 'IRC nick:  '. $ARGV[OPT_IRC_NICK] . "\n"; 
+
+# Get bot's irc nick if not provided as argument
+if (@ARGV <= OPT_IRC_USER) {
+
+  print "
+Enter the IRC user to identify as (leave blank for \"$ARGV[OPT_IRC_OP]\"): ";
+    
+  chomp ($ARGV[OPT_IRC_USER] = <STDIN>);
+  $ARGV[OPT_IRC_USER] or $ARGV[OPT_IRC_USER] = $ARGV[OPT_IRC_OP];
+  
+  print "\n";
+
+}
+print 'IRC user:  '. $ARGV[OPT_IRC_USER] . "\n"; 
+
+# Get bot's irc pass if not provided as argument
+if (@ARGV <= OPT_IRC_PASS && length $ARGV[OPT_IRC_USER]) {
+
+  print "
+Enter the IRC password (leave blank to skip nickserv identify): ";
+    
+  system('stty','-echo');
+  chomp ($ARGV[OPT_IRC_PASS] = <STDIN>);
+  system('stty','echo');
+  
+  print "\n";
+
+}
+
+$op_nick = $ARGV[0];
+$jira_credentials = encode_base64(
+    $ARGV[OPT_JIRA_NAME] . ':' . $ARGV[OPT_JIRA_PASS]
+);
+$irc_nick = $ARGV[OPT_IRC_NICK] || $bot_info->{Nick};
+$irc_user = $ARGV[OPT_IRC_USER];
+$irc_pass = $ARGV[OPT_IRC_PASS];
+
+$bot_info->{Nick} = $irc_nick;
+
+
 
 1;

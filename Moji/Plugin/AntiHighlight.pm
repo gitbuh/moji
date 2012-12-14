@@ -44,7 +44,8 @@ sub setup {
 sub on_names {
 
   my ($kernel, $server, $response) = @_[KERNEL, ARG0, ARG1];
-  my ($channel, $nicks) = $response =~ m/(#[^\s]+)\s*:(.*)/;
+  my ($channel, $nicks) = $response =~ m/(#[^\s]+)\s*:(.*)/
+      or return;
   
   $nicks =~ s/[~&@%+]//g; #strip prefixes from names
   set_nicks($nicks, $channel);
@@ -100,6 +101,8 @@ sub set_nicks {
 sub add_nick {
 
   my ($nick, $channel) = @_;
+  
+  remove_nick($nick, $channel, 1);
    
   $channel_nicks->{$channel} = "" if !$channel_nicks->{$channel};
   
@@ -112,13 +115,14 @@ sub add_nick {
 
 sub remove_nick {
 
-  my ($nick, $channel) = @_;
+  my ($nick, $channel, $hush) = @_;
   
   $channel_nicks->{$channel} = "" if !$channel_nicks->{$channel};
   $channel_nicks->{$channel} =~ s/\s*\b\Q$nick\E\b//g;
   $channel_nicks->{$channel} =~ s/\s+$//;
   
-  print "$nick parted $channel -> " . $channel_nicks->{$channel} . "\n";
+  print "$nick parted $channel -> " . $channel_nicks->{$channel} . "\n"
+      if !$hush;
 
 }
 
@@ -171,8 +175,12 @@ sub mangle {
   my $text = shift;
   
   $text = Acme::Umlautify::umlautify($text);
-  $text =~ s/n/ñ/g;
-  $text =~ s/N/Ñ/g;
+  
+  my $n = chr 241;
+  my $N = chr 209;
+  
+  $text =~ s/n/$n/g;
+  $text =~ s/N/$N/g;
 
   return $text;
 

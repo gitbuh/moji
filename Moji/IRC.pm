@@ -16,6 +16,10 @@ use POE::Component::IRC;
 
 our $irc = POE::Component::IRC->spawn();
 
+my $reconnect_timeout = 5;
+
+my $has_traffic = 1;
+
 # Things for plugins to populate
 
 # POE states (IRC or other)
@@ -24,6 +28,11 @@ our $bot_states = {
   irc_001     => \&on_connect,
   irc_public  => \&on_msg,
   irc_msg     => \&on_msg,
+  irc_notice     => \&on_msg,
+  irc_disconnected => \&on_disconnect,
+  irc_error =>        \&on_disconnect,
+  irc_socketerr =>    \&on_disconnect,
+  bot_mutter =>    \&mutter,
 };
 
 sub run {
@@ -34,12 +43,29 @@ sub run {
 
 }
 
+
+sub mutter {
+
+  if ($has_traffic < 0) {
+    $irc->disconnect();
+  }
+
+  $irc->yield(privmsg => $irc->nick_name(), "mumble, mumble")
+      unless $has_traffic;
+      
+  --$has_traffic;
+      
+  $poe_kernel->delay(bot_mutter => 300);
+
+}
+
 # The bot session has started. Connect to a server.
 
 sub on_start {
   print "Connecting...\n";
   $irc->yield(register => "all");
   $irc->yield(connect => ${Moji::Opt::bot_info});
+  mutter();
 }
 
 # The bot has successfully connected to a server.
@@ -47,6 +73,24 @@ sub on_start {
 sub on_connect {
   
   print "Connected.\n";
+  
+  my $user = ${Moji::Opt::irc_user};
+  my $pass = ${Moji::Opt::irc_pass};
+  
+  $irc->yield(nickserv => "identify $user $pass")
+      if $pass;
+  
+  $irc->yield(join => "#botz");
+  
+}
+
+# The bot has been disconnected.
+
+sub on_disconnect {
+  
+  print "Disconnected, reconnecting in $reconnect_timeout seconds.\n";
+  
+  $poe_kernel->delay(_start => $reconnect_timeout);
   
 }
 
@@ -57,6 +101,8 @@ sub on_msg {
   my $nick    = (split /!/, $who)[0];
   my $channel = $where->[0];
   my $ts      = scalar localtime;
+  
+  $has_traffic = 1;
   
   $channel = $nick if $channel eq $irc->nick_name();
   
