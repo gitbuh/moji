@@ -78,12 +78,18 @@ sub format_issue {
   
   my $comments;
   
-  my $out = $issue->{key} . ": " 
-      . $issue->{fields}->{summary} 
-      . " - " . $issue->{fields}->{status}->{name} 
+  my $fields = $issue->{fields};
+  
+  my $summary = $fields->{summary};
+  
+  $summary =~ s/[^\d\w]*$//;
+  
+  my $out = $issue->{key} . ": $summary - "
+      . ( $fields->{resolution} ? 
+          $fields->{resolution}->{name} : $fields->{status}->{name} )
       . ", updated " . Moji::Time::ago($updated);
   
-  eval { $comments = @{$issue->{fields}->{comment}->{comments}}; };
+  eval { $comments = @{$fields->{comment}->{comments}}; };
       
   if ($comments) {
     my $s = $comments > 1 ? 's' : '';
