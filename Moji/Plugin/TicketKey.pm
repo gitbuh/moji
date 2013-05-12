@@ -19,7 +19,8 @@ sub setup {
   
   my $url = "${Moji::Opt::json_path}/project";
   
-  my $a = get_json($url, ${Moji::Opt::jira_credentials});
+  my $a = get_json($url, ${Moji::Opt::jira_credentials})
+    or return;
   
   for my $obj (@{$a}) {
 

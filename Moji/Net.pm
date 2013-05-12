@@ -67,7 +67,7 @@ sub get_json {
 sub get_xml {
 
   my ($url, $auth) = @_;
-  my $hash = {};
+  my $hash;
   my $response = !$auth ? http(GET => $url) : 
       http(GET => $url, [ "Authorization: Basic $auth" ]);
   

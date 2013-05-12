@@ -144,7 +144,7 @@ sub run_commands {
   my $commands = get_enabled('commands');
   my $cmdlist = join '|', keys %$commands;  
   
-  if ($cmdlist && shift =~ m/\!($cmdlist)\s*(.*)/ig) {
+  if ($cmdlist && shift =~ m/^\!($cmdlist)\s*(.*)/ig) {
     return $commands->{$1}($2, @_) || 1;
   }
 }

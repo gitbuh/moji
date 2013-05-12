@@ -75,6 +75,8 @@ sub on_feed_tick {
     
   my $data = get_xml(
       ${Moji::Opt::feed_path}, ${Moji::Opt::jira_credentials});
+      
+  return if !$data;
   
   # TODO: HEAD request, check Last-Modified header
   
@@ -125,6 +127,8 @@ sub on_feed_tick {
     $desc =~ s/(?:^\s*)|(?:\s*$)//g;  
     
     my $updated = Moji::Time::parse($entry->{updated});
+    
+    next if (DateTime->now() - $updated)->minutes() > 5;
     
     my $link = Moji::Net::shorten_url($entry->{link}->[0]->{href});
     

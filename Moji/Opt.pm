@@ -34,7 +34,7 @@ our $browse_path = "$root_path/browse";
 our $json_path = "$root_path/rest/api/latest";
 
 # JIRA atom feed URL.
-our $feed_path = "$root_path/activity";
+our $feed_path = "$root_path/activity?streams=user+NOT+biff";
 
 # Bot can tell us where to find its source, not used for anything else.
 our $bot_source_url = "https://github.com/gitbuh/moji";

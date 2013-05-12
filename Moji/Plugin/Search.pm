@@ -13,7 +13,8 @@ use Moji::Opt;
 use POE;
 
 # Who searched for what? 
-our $nick_searches = {}; 
+# our $nick_searches = {}; 
+our $channel_searches = {}; 
 
 sub setup { 
 
@@ -28,7 +29,8 @@ sub setup {
         
         my $offset = 0;
         
-        @{$nick_searches->{$nick}} = ( $jql, $offset );
+        # @{$nick_searches->{$nick}} = ( $jql, $offset );
+        @{$channel_searches->{$channel}} = ( $jql, $offset );
         
         search($channel, $jql, $offset, ${Moji::Opt::max_search_results});
 
@@ -43,7 +45,8 @@ sub setup {
         
         my $offset = 0;
         
-        @{$nick_searches->{$nick}} = ( $jql, $offset );
+        # @{$nick_searches->{$nick}} = ( $jql, $offset );
+        @{$channel_searches->{$channel}} = ( $jql, $offset );
         
         search($channel, $jql, $offset, ${Moji::Opt::max_search_results});
 
@@ -64,7 +67,8 @@ sub setup {
         
         $jql .= 'text~"' . $query . '"';
         
-        @{$nick_searches->{$nick}} = ( $jql, $offset );
+        # @{$nick_searches->{$nick}} = ( $jql, $offset );
+        @{$channel_searches->{$channel}} = ( $jql, $offset );
         
         search($channel, $jql, $offset, ${Moji::Opt::max_search_results});
         
@@ -75,19 +79,26 @@ sub setup {
       # Show the next page of search results
 
       more => sub {
+      
         my ($args, $nick, $channel) = @_;
           
-        return if !$nick_searches->{$nick};
+        # return if !$nick_searches->{$nick};
         
-        $nick_searches->{$nick}[1] += ${Moji::Opt::max_search_results};
+        return if !$channel_searches->{$channel};
         
-        my ($jql, $offset) = @{$nick_searches->{$nick}};
+        # $nick_searches->{$nick}[1] += ${Moji::Opt::max_search_results};
+        
+        $channel_searches->{$channel}[1] += ${Moji::Opt::max_search_results};
+        
+        # my ($jql, $offset) = @{$nick_searches->{$nick}};
+        
+        my ($jql, $offset) = @{$channel_searches->{$channel}};
         
         search($channel, $jql, $offset, ${Moji::Opt::max_search_results});
         
         return;
         
-      },
+      }
 
     },
 
